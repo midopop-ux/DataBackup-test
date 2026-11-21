@@ -433,7 +433,7 @@ internal abstract class AbstractBackupService : AbstractPackagesService() {
                 val p = pkg.packageEntity
                 runCatching {
                     val allVersions = mPackageDao.query(p.packageName, OpType.RESTORE, p.userId, mTaskEntity.cloud, mTaskEntity.backupDir)
-                    val preserved = allVersions.filter { it.preserveId != 0L }.sortedByDescending { it.preserveId }
+                    val preserved = allVersions.filter { it.preserveId != 0L }.sortedByDescending { it.extraInfo.lastBackupTime.takeIf { t -> t != 0L } ?: it.preserveId }
                     if (preserved.size > maxPreserveCount) {
                         preserved.drop(maxPreserveCount).forEach { old ->
                             log { "Cleaning old preserved backup: ${old.archivesRelativeDir}" }
