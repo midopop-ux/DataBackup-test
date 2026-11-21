@@ -308,6 +308,11 @@ internal abstract class AbstractBackupService : AbstractPackagesService() {
                         val configDst = PathUtil.getPackageRestoreConfigDst(dstDir = dstDir)
                         mRootService.writeJson(data = restoreEntity, dst = configDst)
                         onConfigSaved(path = configDst, archivesRelativeDir = resolveArchiveRelativeDir(p))
+                        // 清理已被新目录取代的历史纯包名主备份目录，防止同一应用存在两份主备份产生冲突
+                        val legacyDir = "${mAppsDir}/${p.legacyArchivesRelativeDir}"
+                        if (legacyDir != dstDir && mRootService.exists(legacyDir)) {
+                            mRootService.deleteRecursively(legacyDir)
+                        }
                         mPackageDao.upsert(restoreEntity)
                         mPackageDao.upsert(cleanP)
                         pkg.update(packageEntity = cleanP)
