@@ -660,6 +660,11 @@ class AppsRepo @Inject constructor(
     private suspend fun loadLocalApps(onLoad: suspend (cur: Int, max: Int, content: String) -> Unit) {
         val path = pathUtil.getLocalBackupAppsDir()
         val paths = rootService.walkFileTree(path)
+        val backupSaveDir = context.localBackupSaveDir()
+        val seenKeys = mutableMapOf<String, PackageEntity>()
+        val entitiesToUpsert = mutableListOf<PackageEntity>()
+        val idsToDelete = mutableListOf<Long>()
+
         paths.forEachIndexed { index, pathParcelable ->
             val fileName = PathUtil.getFileName(pathParcelable.pathString)
             onLoad(index, paths.size, fileName)
@@ -667,51 +672,58 @@ class AppsRepo @Inject constructor(
                 runCatching {
                     var recovered = false
                     val dirName = pathParcelable.pathList.getOrNull(pathParcelable.pathList.size - 3)
-                    rootService.readJson<PackageEntity>(pathParcelable.pathString).also { p ->
-                        p?.id = 0
-                        p?.extraInfo?.activated = false
-                        p?.indexInfo?.cloud = ""
-                        p?.indexInfo?.backupDir = context.localBackupSaveDir()
-                        // 兼容被旧版扫描污染的历史 json：剥离修复（若命中），并删除数据库旧实体防重复
-                        recovered = dirName != null && p?.recoverPackageNameFromDirName(dirName) == true
-                        parsePreserveAndUserId(pathParcelable).also { result ->
-                            result?.also { (pId, uId) ->
-                                p?.indexInfo?.preserveId = pId
-                                p?.indexInfo?.userId = uId
-                            }
-                        }
-                        // 无论是否剥离，都按目录名查删旧实体（幂等）。
-                        // 删之前继承勾选状态：扫描只是「刷新清单」，不该清空用户已做的选择。
-                        if (p != null && dirName != null) {
-                            val old = appsDao.query(
-                                dirName, OpType.RESTORE,
-                                p.indexInfo.userId, p.indexInfo.preserveId,
-                                p.indexInfo.compressionType, p.indexInfo.cloud, p.indexInfo.backupDir
-                            )
-                            if (old != null) {
-                                p.extraInfo.activated = old.extraInfo.activated
-                                appsDao.delete(old.id)
-                            }
+                    rootService.readJson<PackageEntity>(pathParcelable.pathString)?.let { p ->
+                        p.id = 0
+                        p.extraInfo.activated = false
+                        p.indexInfo.cloud = ""
+                        p.indexInfo.backupDir = backupSaveDir
+                        // 兼容被旧版扫描污染的历史 json：剥离修复（若命中）
+                        recovered = dirName != null && p.recoverPackageNameFromDirName(dirName)
+                        parsePreserveAndUserId(pathParcelable)?.let { (pId, uId) ->
+                            p.indexInfo.preserveId = pId
+                            p.indexInfo.userId = uId
                         }
                         // 剥离成功时写回 json 修复被污染的数据
-                        if (recovered && p != null) {
+                        if (recovered) {
                             rootService.writeJson(data = p, dst = pathParcelable.pathString)
                         }
-                    }?.apply {
-                        if (appsDao.query(packageName, indexInfo.opType, userId, preserveId, indexInfo.compressionType, indexInfo.cloud, indexInfo.backupDir) == null) {
-                            appsDao.upsert(this)
+                        // 去重口径：同一包名 + userId + preserveId + compressionType + cloud + backupDir
+                        val key = "${p.packageName}_${p.userId}_${p.preserveId}_${p.indexInfo.compressionType}_${p.indexInfo.cloud}_${p.indexInfo.backupDir}"
+                        val existingInScan = seenKeys[key]
+                        if (existingInScan == null || p.extraInfo.lastBackupTime >= existingInScan.extraInfo.lastBackupTime) {
+                            seenKeys[key] = p
                         }
                     }
                 }
             }
         }
+
+        seenKeys.values.forEach { p ->
+            val existing = appsDao.query(
+                p.packageName, p.indexInfo.opType, p.userId, p.preserveId,
+                p.indexInfo.compressionType, p.indexInfo.cloud, p.indexInfo.backupDir
+            )
+            if (existing != null) {
+                p.id = existing.id
+                p.extraInfo.activated = existing.extraInfo.activated
+            }
+            entitiesToUpsert.add(p)
+        }
+
+        if (entitiesToUpsert.isNotEmpty()) {
+            appsDao.upsert(entitiesToUpsert)
+        }
+
         rootService.clearEmptyDirectoriesRecursively(path)
-        appsDao.queryPackages(OpType.RESTORE, "", context.localBackupSaveDir()).forEach {
+        appsDao.queryPackages(OpType.RESTORE, "", backupSaveDir).forEach {
             val src = "${path}/${it.archivesRelativeDir}"
             val legacySrc = "${path}/${it.legacyArchivesRelativeDir}"
             if (rootService.exists(src).not() && rootService.exists(legacySrc).not()) {
-                appsDao.delete(it.id)
+                idsToDelete.add(it.id)
             }
+        }
+        if (idsToDelete.isNotEmpty()) {
+            appsDao.deleteByIds(idsToDelete)
         }
     }
 
@@ -722,6 +734,10 @@ class AppsRepo @Inject constructor(
             if (client.exists(path)) {
                 val paths = client.walkFileTree(path)
                 val tmpDir = pathUtil.getCloudTmpDir()
+                val seenKeys = mutableMapOf<String, PackageEntity>()
+                val entitiesToUpsert = mutableListOf<PackageEntity>()
+                val idsToDelete = mutableListOf<Long>()
+
                 paths.forEachIndexed { index, pathParcelable ->
                     val fileName = PathUtil.getFileName(pathParcelable.pathString)
                     onLoad(index, paths.size, fileName)
@@ -735,7 +751,7 @@ class AppsRepo @Inject constructor(
                                     p.extraInfo.activated = false
                                     p.indexInfo.cloud = entity.name
                                     p.indexInfo.backupDir = remote
-                                    // 兼容被旧版扫描污染的历史 json：剥离修复（若命中），并删除数据库旧实体防重复
+                                    // 兼容被旧版扫描污染的历史 json：剥离修复（若命中）
                                     if (dirName != null) {
                                         p.recoverPackageNameFromDirName(dirName)
                                     }
@@ -743,26 +759,33 @@ class AppsRepo @Inject constructor(
                                         p.indexInfo.preserveId = pId
                                         p.indexInfo.userId = uId
                                     }
-                                    // 删之前继承勾选状态：刷新清单不该清空用户已做的选择
-                                    if (dirName != null) {
-                                        val old = appsDao.query(
-                                            dirName, OpType.RESTORE,
-                                            p.indexInfo.userId, p.indexInfo.preserveId,
-                                            p.indexInfo.compressionType, p.indexInfo.cloud, p.indexInfo.backupDir
-                                        )
-                                        if (old != null) {
-                                            p.extraInfo.activated = old.extraInfo.activated
-                                            appsDao.delete(old.id)
-                                        }
-                                    }
-                                    if (appsDao.query(p.packageName, p.indexInfo.opType, p.userId, p.preserveId, p.indexInfo.compressionType, p.indexInfo.cloud, p.indexInfo.backupDir) == null) {
-                                        appsDao.upsert(p)
+                                    val key = "${p.packageName}_${p.userId}_${p.preserveId}_${p.indexInfo.compressionType}_${p.indexInfo.cloud}_${p.indexInfo.backupDir}"
+                                    val existingInScan = seenKeys[key]
+                                    if (existingInScan == null || p.extraInfo.lastBackupTime >= existingInScan.extraInfo.lastBackupTime) {
+                                        seenKeys[key] = p
                                     }
                                 }
                             }
                         }
                     }
                 }
+
+                seenKeys.values.forEach { p ->
+                    val existing = appsDao.query(
+                        p.packageName, p.indexInfo.opType, p.userId, p.preserveId,
+                        p.indexInfo.compressionType, p.indexInfo.cloud, p.indexInfo.backupDir
+                    )
+                    if (existing != null) {
+                        p.id = existing.id
+                        p.extraInfo.activated = existing.extraInfo.activated
+                    }
+                    entitiesToUpsert.add(p)
+                }
+
+                if (entitiesToUpsert.isNotEmpty()) {
+                    appsDao.upsert(entitiesToUpsert)
+                }
+
                 // 与本地扫描（loadLocalApps）保持一致：清掉扫描后残留的空目录，
                 // 例如删除备份后剩下的空应用文件夹。只清空的，有内容的不动。
                 client.clearEmptyDirectoriesRecursively(path)
@@ -772,8 +795,11 @@ class AppsRepo @Inject constructor(
                     // 清扫必须双探测，否则刚从 config 入库的实体会被误判不存在而立刻删除。
                     val legacySrc = "${path}/${it.legacyArchivesRelativeDir}"
                     if (client.exists(src).not() && client.exists(legacySrc).not()) {
-                        appsDao.delete(it.id)
+                        idsToDelete.add(it.id)
                     }
+                }
+                if (idsToDelete.isNotEmpty()) {
+                    appsDao.deleteByIds(idsToDelete)
                 }
             }
         }

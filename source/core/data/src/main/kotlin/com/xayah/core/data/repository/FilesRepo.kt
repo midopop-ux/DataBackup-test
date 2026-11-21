@@ -251,24 +251,39 @@ class FilesRepo @Inject constructor(
     private suspend fun loadLocalFiles(onLoad: suspend (cur: Int, max: Int, content: String) -> Unit) {
         val path = pathUtil.getLocalBackupFilesDir()
         val paths = rootService.walkFileTree(path)
+        val backupSaveDir = context.localBackupSaveDir()
+        val seenKeys = mutableMapOf<String, MediaEntity>()
+        val entitiesToUpsert = mutableListOf<MediaEntity>()
+
         paths.forEachIndexed { index, pathParcelable ->
             val fileName = PathUtil.getFileName(pathParcelable.pathString)
             onLoad(index, paths.size, fileName)
             if (fileName == ConfigsMediaRestoreName) {
                 runCatching {
-                    rootService.readJson<MediaEntity>(pathParcelable.pathString).also { m ->
-                        m?.id = 0
-                        m?.extraInfo?.existed = true
-                        m?.extraInfo?.activated = false
-                        m?.indexInfo?.cloud = ""
-                        m?.indexInfo?.backupDir = context.localBackupSaveDir()
-                    }?.apply {
-                        if (filesDao.query(indexInfo.opType, preserveId, name, indexInfo.compressionType, indexInfo.cloud, indexInfo.backupDir) == null) {
-                            filesDao.upsert(this)
-                        }
+                    rootService.readJson<MediaEntity>(pathParcelable.pathString)?.let { m ->
+                        m.id = 0
+                        m.extraInfo.existed = true
+                        m.extraInfo.activated = false
+                        m.indexInfo.cloud = ""
+                        m.indexInfo.backupDir = backupSaveDir
+                        val key = "${m.name}_${m.preserveId}_${m.indexInfo.compressionType}_${m.indexInfo.cloud}_${m.indexInfo.backupDir}"
+                        seenKeys[key] = m
                     }
                 }
             }
+        }
+
+        seenKeys.values.forEach { m ->
+            val existing = filesDao.query(m.indexInfo.opType, m.preserveId, m.name, m.indexInfo.compressionType, m.indexInfo.cloud, m.indexInfo.backupDir)
+            if (existing != null) {
+                m.id = existing.id
+                m.extraInfo.activated = existing.extraInfo.activated
+            }
+            entitiesToUpsert.add(m)
+        }
+
+        if (entitiesToUpsert.isNotEmpty()) {
+            filesDao.upsert(entitiesToUpsert)
         }
     }
 
@@ -279,26 +294,41 @@ class FilesRepo @Inject constructor(
             if (client.exists(src)) {
                 val paths = client.walkFileTree(src)
                 val tmpDir = pathUtil.getCloudTmpDir()
+                val seenKeys = mutableMapOf<String, MediaEntity>()
+                val entitiesToUpsert = mutableListOf<MediaEntity>()
+
                 paths.forEachIndexed { index, pathParcelable ->
                     val fileName = PathUtil.getFileName(pathParcelable.pathString)
                     onLoad(index, paths.size, fileName)
                     if (fileName == ConfigsMediaRestoreName) {
                         runCatching {
                             cloudRepo.download(client = client, src = pathParcelable.pathString, dstDir = tmpDir) { path ->
-                                val stored = rootService.readJson<MediaEntity>(path).also { p ->
-                                    p?.id = 0
-                                    p?.extraInfo?.existed = true
-                                    p?.extraInfo?.activated = false
-                                    p?.indexInfo?.cloud = entity.name
-                                    p?.indexInfo?.backupDir = remote
-                                }?.apply {
-                                    if (filesDao.query(indexInfo.opType, preserveId, name, indexInfo.compressionType, indexInfo.cloud, indexInfo.backupDir) == null) {
-                                        filesDao.upsert(this)
-                                    }
+                                val stored = rootService.readJson<MediaEntity>(path)
+                                if (stored != null) {
+                                    stored.id = 0
+                                    stored.extraInfo.existed = true
+                                    stored.extraInfo.activated = false
+                                    stored.indexInfo.cloud = entity.name
+                                    stored.indexInfo.backupDir = remote
+                                    val key = "${stored.name}_${stored.preserveId}_${stored.indexInfo.compressionType}_${stored.indexInfo.cloud}_${stored.indexInfo.backupDir}"
+                                    seenKeys[key] = stored
                                 }
                             }
                         }
                     }
+                }
+
+                seenKeys.values.forEach { m ->
+                    val existing = filesDao.query(m.indexInfo.opType, m.preserveId, m.name, m.indexInfo.compressionType, m.indexInfo.cloud, m.indexInfo.backupDir)
+                    if (existing != null) {
+                        m.id = existing.id
+                        m.extraInfo.activated = existing.extraInfo.activated
+                    }
+                    entitiesToUpsert.add(m)
+                }
+
+                if (entitiesToUpsert.isNotEmpty()) {
+                    filesDao.upsert(entitiesToUpsert)
                 }
             }
         }
