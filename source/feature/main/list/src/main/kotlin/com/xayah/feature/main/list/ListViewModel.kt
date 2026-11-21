@@ -17,7 +17,6 @@ import com.xayah.core.util.ifEmptyEncodeURLWithSpace
 import com.xayah.core.util.launchOnDefault
 import com.xayah.core.util.localBackupSaveDir
 import com.xayah.core.util.navigateSingle
-import com.xayah.core.work.WorkManagerInitializer
 import com.xayah.feature.main.list.ListUiState.Loading
 import com.xayah.feature.main.list.ListUiState.Success
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -77,48 +76,6 @@ class ListViewModel @Inject constructor(
 
     fun onResume() {
         viewModelScope.launchOnDefault {
-            when (uiState.value) {
-                is Success.Apps -> {
-                    when (opType) {
-                        OpType.BACKUP -> {
-                            val state = uiState.value.castTo<Success.Apps>()
-                            if (state.isUpdating.not()) {
-                                WorkManagerInitializer.fastInitializeAndUpdateApps(context)
-                            }
-                        }
-
-                        OpType.RESTORE -> {
-                            // 恢复页进入时按当前备份源自动扫一次清单：此前这里留空，
-                            // 用户必须手点右上角「刷新」才能看到云端备份的应用。
-                            val state = uiState.value.castTo<Success.Apps>()
-                            if (state.isUpdating.not()) {
-                                WorkManagerInitializer.loadAppBackups(context, cloudName, backupDir)
-                            }
-                        }
-                    }
-                }
-
-                is Success.Files -> {
-                    when (opType) {
-                        OpType.BACKUP -> {
-                            val state = uiState.value.castTo<Success.Files>()
-                            if (state.isUpdating.not()) {
-                                WorkManagerInitializer.fastInitializeAndUpdateFiles(context)
-                            }
-                        }
-
-                        OpType.RESTORE -> {
-                            // 同应用侧：恢复页进入时按当前备份源自动扫一次文件清单。
-                            val state = uiState.value.castTo<Success.Files>()
-                            if (state.isUpdating.not()) {
-                                WorkManagerInitializer.loadFileBackups(context, cloudName, backupDir)
-                            }
-                        }
-                    }
-                }
-
-                else -> {}
-            }
             // "默认全量备份"开关：进入备份页时自动 selectAll 所有应用/文件。
             // 关闭开关时此调用直接 return，不动用户已选。
             listDataRepo.autoSelectAllIfEnabled(opType = opType, target = target)
