@@ -8,10 +8,13 @@ plugins {
     alias(libs.plugins.refine)
 }
 
-// 应用内「更新日志」页读仓库根的 CHANGELOG.md（release-please 维护的单一来源）：
+// 应用内「更新日志」页读仓库根的 CHANGELOG.md / CHANGELOG_zh.md（多语言支持）：
 // 构建期拷进 assets，避免在源码里再维护一份副本。
 val copyChangelogToAssets by tasks.registering(Copy::class) {
-    from(rootProject.file("../CHANGELOG.md"))
+    from(rootProject.file("..")) {
+        include("CHANGELOG.md")
+        include("CHANGELOG_*.md")
+    }
     into(layout.buildDirectory.dir("generated/changelogAssets"))
 }
 // 生成的 assets 目录既被 merge*Assets 消费，也被 lint 的 model 任务读取，

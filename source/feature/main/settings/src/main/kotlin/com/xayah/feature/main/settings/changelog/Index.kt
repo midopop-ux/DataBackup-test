@@ -104,8 +104,9 @@ private fun ChangelogVersion.title(isCurrent: Boolean, currentLabel: String): St
 @Composable
 private fun ChangelogItem(item: String) {
     val clean = item.replace("**", "").replace("`", "")
-    val head = clean.substringBefore("：", missingDelimiterValue = "")
-    val rest = clean.substringAfter("：", missingDelimiterValue = "")
+    val delimiter = if (clean.contains("：")) "：" else if (clean.contains(": ")) ": " else if (clean.contains(":")) ":" else ""
+    val head = if (delimiter.isNotEmpty()) clean.substringBefore(delimiter).trim() else ""
+    val rest = if (delimiter.isNotEmpty()) clean.substringAfter(delimiter).trim() else ""
     val hasHead = head.isNotEmpty() && rest.isNotEmpty() && head.length <= HEAD_MAX_LENGTH
 
     Column(modifier = Modifier.paddingHorizontal(SizeTokens.Level16), verticalArrangement = Arrangement.spacedBy(SizeTokens.Level4)) {

@@ -1,6 +1,7 @@
 package com.xayah.core.util
 
 import android.content.Context
+import java.util.Locale
 
 /** 更新日志里的一个小节（如「修复」「优化」） */
 data class ChangelogSection(
@@ -17,11 +18,12 @@ data class ChangelogVersion(
 
 /** 打包进 assets 的更新日志文件名（构建期由 Gradle 从仓库根 CHANGELOG.md 拷入） */
 const val CHANGELOG_ASSET = "CHANGELOG.md"
+const val CHANGELOG_ZH_ASSET = "CHANGELOG_zh.md"
 
-private val VERSION_REGEX = Regex("""^##\s+v?([0-9][0-9A-Za-z.\-_]*)\s*(?:[（(]\s*([^）)]*?)\s*[）)])?\s*$""")
-private val SECTION_REGEX = Regex("""^###+\s+(.+?)\s*$""")
-private val ITEM_REGEX = Regex("""^[-*]\s+(.+?)\s*$""")
-private val RULE_REGEX = Regex("""^([-*_]\s*){3,}$""")
+private val VERSION_REGEX = Regex("^##\\s+v?([0-9][0-9A-Za-z.\\-_]*)\\s*(?:[（(]\\s*([^）)]*?)\\s*[）)])?\\s*$")
+private val SECTION_REGEX = Regex("^###+\\s+(.+?)\\s*$")
+private val ITEM_REGEX = Regex("^[-*]\\s+(.+?)\\s*$")
+private val RULE_REGEX = Regex("^([-_*]\\s*){3,}$")
 
 /**
  * 解析 CHANGELOG.md 文本。
@@ -138,9 +140,20 @@ fun parseChangelog(markdown: String): List<ChangelogVersion> {
     return versions
 }
 
-/** 读 assets 里打包的 CHANGELOG.md；读不到返回空串（页面自行做空态展示） */
+/** 读 assets 里打包的 CHANGELOG.md（支持根据系统/应用语言加载对应语言的更新日志） */
 fun Context.readChangelogText(): String = runCatching {
-    assets.open(CHANGELOG_ASSET).bufferedReader().use { it.readText() }
+    val locale = runCatching { resources.configuration.locales[0] }.getOrNull() ?: java.util.Locale.getDefault()
+    val lang = locale.language.lowercase()
+    val candidates = if (lang.startsWith("zh")) {
+        listOf(CHANGELOG_ZH_ASSET, CHANGELOG_ASSET)
+    } else {
+        listOf(CHANGELOG_ASSET, CHANGELOG_ZH_ASSET)
+    }
+    for (candidate in candidates) {
+        val text = runCatching { assets.open(candidate).bufferedReader().use { it.readText() } }.getOrNull()
+        if (!text.isNullOrEmpty()) return@runCatching text
+    }
+    ""
 }.getOrDefault("")
 
 /** 读并解析 assets 里的 CHANGELOG.md */
