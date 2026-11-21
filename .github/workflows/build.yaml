@@ -15,6 +15,10 @@ on:
           description: 'Foss'
           required: true
           default: 'false'
+        Arm64Only:
+          description: 'Build Arm64-v8a only (Fast)'
+          required: true
+          default: 'true'
 
 jobs:
   build:
@@ -67,19 +71,32 @@ jobs:
           BUILD_ALPHA: ${{ github.event.inputs.Alpha }}
           BUILD_PREMIUM: ${{ github.event.inputs.Premium }}
           BUILD_FOSS: ${{ github.event.inputs.Foss }}
+          BUILD_ARM64_ONLY: ${{ github.event.inputs.Arm64Only || 'true' }}
         run: |
           TASKS=""
-          if [ ${BUILD_ALPHA} = 'true' ]; then
-            TASKS="$TASKS assembleArm64-v8aAlphaRelease assembleArmeabi-v7aAlphaRelease assembleX86AlphaRelease assembleX86_64AlphaRelease"
+          if [ "${BUILD_ARM64_ONLY}" = 'true' ]; then
+            if [ "${BUILD_ALPHA}" = 'true' ]; then
+              TASKS="$TASKS assembleArm64-v8aAlphaRelease"
+            fi
+            if [ "${BUILD_PREMIUM}" = 'true' ]; then
+              TASKS="$TASKS assembleArm64-v8aPremiumRelease"
+            fi
+            if [ "${BUILD_FOSS}" = 'true' ]; then
+              TASKS="$TASKS assembleArm64-v8aFossRelease"
+            fi
+          else
+            if [ "${BUILD_ALPHA}" = 'true' ]; then
+              TASKS="$TASKS assembleArm64-v8aAlphaRelease assembleArmeabi-v7aAlphaRelease assembleX86AlphaRelease assembleX86_64AlphaRelease"
+            fi
+            if [ "${BUILD_PREMIUM}" = 'true' ]; then
+              TASKS="$TASKS assembleArm64-v8aPremiumRelease assembleArmeabi-v7aPremiumRelease assembleX86PremiumRelease assembleX86_64PremiumRelease"
+            fi
+            if [ "${BUILD_FOSS}" = 'true' ]; then
+              TASKS="$TASKS assembleArm64-v8aFossRelease assembleArmeabi-v7aFossRelease assembleX86FossRelease assembleX86_64FossRelease"
+            fi
           fi
-          if [ ${BUILD_PREMIUM} = 'true' ]; then
-            TASKS="$TASKS assembleArm64-v8aPremiumRelease assembleArmeabi-v7aPremiumRelease assembleX86PremiumRelease assembleX86_64PremiumRelease"
-          fi
-          if [ ${BUILD_FOSS} = 'true' ]; then
-            TASKS="$TASKS assembleArm64-v8aFossRelease assembleArmeabi-v7aFossRelease assembleX86FossRelease assembleX86_64FossRelease"
-          fi
-          if [ -z ${TASKS} ]; then
-            TASKS="assembleRelease"
+          if [ -z "${TASKS}" ]; then
+            TASKS="assembleArm64-v8aAlphaRelease"
           fi
           ./gradlew $TASKS --daemon --parallel
 
