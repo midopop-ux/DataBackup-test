@@ -45,7 +45,6 @@ android {
         abortOnError = false
         checkReleaseBuilds = false
         disable += "MissingTranslation"
-        disable += "ExtraTranslation"
     }
 
     flavorDimensions += listOf("abi", "feature")

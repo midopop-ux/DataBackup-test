@@ -34,7 +34,6 @@ private fun Project.configureCommon() {
             abortOnError = false
             checkReleaseBuilds = false
             disable += "MissingTranslation"
-            disable += "ExtraTranslation"
         }
 
         buildTypes {
