@@ -104,22 +104,26 @@ fun Clickable(
     desc: String? = null,
     leadingContent: (@Composable RowScope.() -> Unit)? = null,
     titleTrailingContent: (@Composable RowScope.() -> Unit)? = null,
+    titleBottomContent: (@Composable ColumnScope.() -> Unit)? = null,
+    bottomContent: (@Composable ColumnScope.() -> Unit)? = null,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
     onClick: () -> Unit = {}
 ) {
     Clickable(enabled = enabled, desc = desc, onClick = onClick, indication = if (readOnly) null else ripple()) {
         Row(modifier = Modifier.height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SizeTokens.Level16)) {
             if (leadingContent != null) leadingContent()
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SizeTokens.Level8)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SizeTokens.Level8)) {
-                    AnimatedTextContainer(targetState = title) { text ->
+                    AnimatedTextContainer(targetState = title, modifier = Modifier.weight(1f, fill = false)) { text ->
                         TitleLargeText(enabled = enabled, text = text, color = ThemedColorSchemeKeyTokens.OnSurface.value.withState(enabled), fontWeight = FontWeight.Normal)
                     }
                     if (titleTrailingContent != null) titleTrailingContent()
                 }
+                titleBottomContent?.invoke(this)
                 if (value != null) AnimatedTextContainer(targetState = value) { text ->
                     TitleSmallText(enabled = enabled, text = text, color = ThemedColorSchemeKeyTokens.Outline.value.withState(enabled), fontWeight = FontWeight.Normal)
                 }
+                bottomContent?.invoke(this)
             }
             if (trailingContent != null) trailingContent()
         }
@@ -235,13 +239,16 @@ fun Selectable(
         leadingContent = if (leadingIcon == null) null else {
             { Icon(imageVector = leadingIcon, contentDescription = null) }
         },
-        trailingContent = {
+        bottomContent = {
             FilledTonalButton(enabled = enabled, onClick = { scope.launch { onClick() } }) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(SizeTokens.Level8),
                 ) {
-                    Text(text = current)
+                    Text(
+                        modifier = Modifier.weight(1f, fill = false),
+                        text = current
+                    )
                     trailingExtra?.invoke(this)
                 }
             }
@@ -262,6 +269,7 @@ fun Switchable(
     desc: String? = null,
     leadingContent: (@Composable RowScope.() -> Unit)? = null,
     titleTrailingContent: (@Composable RowScope.() -> Unit)? = null,
+    titleBottomContent: (@Composable ColumnScope.() -> Unit)? = null,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
     onCheckedChange: (Boolean) -> Unit = {}
 ) {
@@ -271,6 +279,7 @@ fun Switchable(
         value = if (checked) checkedText else notCheckedText,
         desc = desc,
         titleTrailingContent = titleTrailingContent,
+        titleBottomContent = titleBottomContent,
         leadingContent = {
             if (icon != null) Icon(imageVector = icon, contentDescription = null)
             if (leadingContent != null) leadingContent()
@@ -309,6 +318,7 @@ fun Switchable(
     desc: String? = null,
     leadingContent: (@Composable RowScope.() -> Unit)? = null,
     titleTrailingContent: (@Composable RowScope.() -> Unit)? = null,
+    titleBottomContent: (@Composable ColumnScope.() -> Unit)? = null,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
     onCheckedChange: (Boolean) -> Unit = {}
 ) {
@@ -330,6 +340,7 @@ fun Switchable(
         desc = desc,
         leadingContent = leadingContent,
         titleTrailingContent = titleTrailingContent,
+        titleBottomContent = titleBottomContent,
         trailingContent = trailingContent,
         onCheckedChange = {
             scope.launch {

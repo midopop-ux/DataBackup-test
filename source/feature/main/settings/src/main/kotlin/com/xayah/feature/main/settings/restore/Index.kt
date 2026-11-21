@@ -285,16 +285,18 @@ fun PageRestoreSettings() {
                     key = KeyClearDeviceFingerprint,
                     defValue = false,
                     title = stringResource(id = R.string.clear_device_fingerprint),
-                    checkedText = stringResource(id = R.string.clear_device_fingerprint_desc),
-                    titleTrailingContent = {
+                    titleBottomContent = {
                         LabelMediumText(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(SizeTokens.Level4))
                                 .background(ThemedColorSchemeKeyTokens.PrimaryContainer.value)
                                 .padding(horizontal = SizeTokens.Level8, vertical = SizeTokens.Level2),
-                            text = stringResource(id = R.string.experimental),
+                            text = "(${stringResource(id = R.string.experimental)})",
                             color = ThemedColorSchemeKeyTokens.OnPrimaryContainer.value,
                         )
+                    },
+                    checkedText = stringResource(id = R.string.clear_device_fingerprint_desc),
+                    titleTrailingContent = {
                         Icon(
                             imageVector = Icons.Outlined.Info,
                             contentDescription = null,

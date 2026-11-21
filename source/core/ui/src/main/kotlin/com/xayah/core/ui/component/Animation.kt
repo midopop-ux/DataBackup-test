@@ -31,9 +31,11 @@ import com.xayah.core.ui.token.AnimationTokens
 @Composable
 fun AnimatedTextContainer(
     targetState: String,
+    modifier: Modifier = Modifier,
     content: @Composable AnimatedVisibilityScope.(targetState: String) -> Unit,
 ) {
     AnimatedContent(
+        modifier = modifier,
         targetState = targetState,
         transitionSpec = {
             // Compare the incoming number with the previous number.
