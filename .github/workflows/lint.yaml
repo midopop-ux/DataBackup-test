@@ -1,12 +1,7 @@
 name: Lint
 
 on:
-  push:
-    paths:
-    - source/**
-  pull_request:
-    paths:
-    - source/**
+  workflow_dispatch:
 
 jobs:
   build:

@@ -1,14 +1,7 @@
 name: Bin
 
 on:
-  push:
-    paths:
-    - build/**
-  pull_request:
-    paths:
-    - build/**
   workflow_dispatch:
-    inputs:
 
 jobs:
   build:

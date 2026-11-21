@@ -1,8 +1,6 @@
 name: Build Companion (FTP Server exe)
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
 
 permissions:
