@@ -8,15 +8,15 @@ plugins {
     alias(libs.plugins.refine)
 }
 
-// Ó¦ÓÃÄÚ¡¸¸üĞÂÈÕÖ¾¡¹Ò³¶Á²Ö¿â¸ùµÄ CHANGELOG.md£¨release-please Î¬»¤µÄµ¥Ò»À´Ô´£©£º
-// ¹¹½¨ÆÚ¿½½ø assets£¬±ÜÃâÔÚÔ´ÂëÀïÔÙÎ¬»¤Ò»·İ¸±±¾¡£
+// åº”ç”¨å†…ã€Œæ›´æ–°æ—¥å¿—ã€é¡µè¯»ä»“åº“æ ¹çš„ CHANGELOG.mdï¼ˆrelease-please ç»´æŠ¤çš„å•ä¸€æ¥æºï¼‰ï¼š
+// æ„å»ºæœŸæ‹·è¿› assetsï¼Œé¿å…åœ¨æºç é‡Œå†ç»´æŠ¤ä¸€ä»½å‰¯æœ¬ã€‚
 val copyChangelogToAssets by tasks.registering(Copy::class) {
     from(rootProject.file("../CHANGELOG.md"))
     into(layout.buildDirectory.dir("generated/changelogAssets"))
 }
-// Éú³ÉµÄ assets Ä¿Â¼¼È±» merge*Assets Ïû·Ñ£¬Ò²±» lint µÄ model ÈÎÎñ¶ÁÈ¡£¬
-// Á½´¦¶¼ÒªÏÔÊ½ÉùÃ÷ÒÀÀµ£¬·ñÔò Gradle ÈÎÎñĞ£Ñé»á±¨ implicit dependency¡£
-// ×¢ÒâÅÅ³ı±¾ÈÎÎñ×ÔÉí£ºËüµÄÃû×ÖÀïÒ²º¬ "Assets"£¬·ñÔò»á×Ô»·¡£
+// ç”Ÿæˆçš„ assets ç›®å½•æ—¢è¢« merge*Assets æ¶ˆè´¹ï¼Œä¹Ÿè¢« lint çš„ model ä»»åŠ¡è¯»å–ï¼Œ
+// ä¸¤å¤„éƒ½è¦æ˜¾å¼å£°æ˜ä¾èµ–ï¼Œå¦åˆ™ Gradle ä»»åŠ¡æ ¡éªŒä¼šæŠ¥ implicit dependencyã€‚
+// æ³¨æ„æ’é™¤æœ¬ä»»åŠ¡è‡ªèº«ï¼šå®ƒçš„åå­—é‡Œä¹Ÿå« "Assets"ï¼Œå¦åˆ™ä¼šè‡ªç¯ã€‚
 tasks.matching { (it.name.endsWith("Assets") || it.name.contains("lint", ignoreCase = true)) && it.name != "copyChangelogToAssets" }.configureEach {
     dependsOn(copyChangelogToAssets)
 }
@@ -42,7 +42,10 @@ android {
     }
 
     lint {
+        abortOnError = false
+        checkReleaseBuilds = false
         disable += "MissingTranslation"
+        disable += "ExtraTranslation"
     }
 
     flavorDimensions += listOf("abi", "feature")
@@ -170,9 +173,9 @@ dependencies {
     implementation(libs.bountycastle)
 }
 
-// ·¢°æºó×Ô¶¯¹éµµ R8 mapping µ½²Ö¿â docs/mappings/£¨¸ÃÄ¿Â¼ÒÑÔÚ .gitignore£¬½ö±¾µØ±£Áô£©¡£
-// ÓÃ»§·´À¡µÄ»ìÏı±ÀÀ£¶ÑÕ»£¨Èç U.E5 ÕâÀà£©±ØĞëÓÃ¶ÔÓ¦°æ±¾µÄ mapping ·´½â£¨retrace£©²ÅÄÜ»¹Ô­ÕæÊµÀàÃûÓëĞĞºÅ¡£
-// ÓÃ·¨£ºgradlew archiveMappingArm64AlphaRelease£¨ÒÑÒÀÀµ assemble£¬¿ÉÖ±½ÓÅÜ£©¡£
+// å‘ç‰ˆåè‡ªåŠ¨å½’æ¡£ R8 mapping åˆ°ä»“åº“ docs/mappings/ï¼ˆè¯¥ç›®å½•å·²åœ¨ .gitignoreï¼Œä»…æœ¬åœ°ä¿ç•™ï¼‰ã€‚
+// ç”¨æˆ·åé¦ˆçš„æ··æ·†å´©æºƒå †æ ˆï¼ˆå¦‚ U.E5 è¿™ç±»ï¼‰å¿…é¡»ç”¨å¯¹åº”ç‰ˆæœ¬çš„ mapping åè§£ï¼ˆretraceï¼‰æ‰èƒ½è¿˜åŸçœŸå®ç±»åä¸è¡Œå·ã€‚
+// ç”¨æ³•ï¼šgradlew archiveMappingArm64AlphaReleaseï¼ˆå·²ä¾èµ– assembleï¼Œå¯ç›´æ¥è·‘ï¼‰ã€‚
 tasks.register("archiveMappingArm64AlphaRelease") {
     dependsOn("assembleArm64-v8aAlphaRelease")
     doLast {

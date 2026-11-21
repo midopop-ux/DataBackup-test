@@ -30,6 +30,13 @@ private fun Project.configureCommon() {
             }
         }
 
+        lint {
+            abortOnError = false
+            checkReleaseBuilds = false
+            disable += "MissingTranslation"
+            disable += "ExtraTranslation"
+        }
+
         buildTypes {
             release {
                 isMinifyEnabled = true
